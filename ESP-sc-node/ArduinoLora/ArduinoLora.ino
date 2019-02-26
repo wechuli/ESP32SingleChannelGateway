@@ -9,21 +9,20 @@
 #include <math.h>
 #include "SSD1306.h"
 
-
 // LoRaWAN NwkSKey, network session key
-static const PROGMEM u1_t NWKSKEY[16] = { 0xF7, 0x1D, 0x1B, 0xA1, 0xB6, 0x41, 0x4F, 0x42, 0x6E, 0x04, 0x5B, 0x24, 0xD2, 0xB0, 0x5E, 0xE8 };
+static const PROGMEM u1_t NWKSKEY[16] = {0xF7, 0x1D, 0x1B, 0xA1, 0xB6, 0x41, 0x4F, 0x42, 0x6E, 0x04, 0x5B, 0x24, 0xD2, 0xB0, 0x5E, 0xE8};
 // LoRaWAN AppSKey, application session key
-static const u1_t PROGMEM APPSKEY[16] = { 0x04, 0xAB, 0x58, 0xF8, 0x23, 0x05, 0x70, 0xFB, 0x92, 0xDE, 0x9A, 0x9D, 0xD9, 0x89, 0x7B, 0xDD };
+static const u1_t PROGMEM APPSKEY[16] = {0x04, 0xAB, 0x58, 0xF8, 0x23, 0x05, 0x70, 0xFB, 0x92, 0xDE, 0x9A, 0x9D, 0xD9, 0x89, 0x7B, 0xDD};
 // LoRaWAN end-device address (DevAddr)
-//static const u4_t DEVADDR = { 0x26041938 };
-static const u4_t DEVADDR = { 0x26, 0x01, 0x17, 0x15 };
+static const u4_t DEVADDR = {0x26011715};
+// static const u4_t DEVADDR = { 0x26, 0x01, 0x17, 0x15 };
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
 // DISABLE_JOIN is set in config.h, otherwise the linker will complain).
-void os_getArtEui (u1_t* buf) { }
-void os_getDevEui (u1_t* buf) { }
-void os_getDevKey (u1_t* buf) { }
+void os_getArtEui(u1_t *buf) {}
+void os_getDevEui(u1_t *buf) {}
+void os_getDevKey(u1_t *buf) {}
 
 static osjob_t sendjob;
 // Schedule data trasmission in every this many seconds (might become longer due to duty
@@ -33,78 +32,75 @@ const unsigned TX_INTERVAL = 10; // Fair Use policy of TTN requires update inter
 
 // Pin mapping according to Cytron LoRa Shield RFM
 const lmic_pinmap lmic_pins = {
-  .nss = 18,
-  .rxtx = LMIC_UNUSED_PIN,
-  .rst = 14,
-  .dio = {26, 33, 32},
+    .nss = 18,
+    .rxtx = LMIC_UNUSED_PIN,
+    .rst = 14,
+    .dio = {26, 33, 32},
 };
 
 /** Pin number for DHT11 data pin */
 int dhtPin = 17;
 
 // Adafruit GPS
-#define SERIAL1_RXPIN 12
-#define SERIAL1_TXPIN 13
+// #define SERIAL1_RXPIN 12
+// #define SERIAL1_TXPIN 13
 
-HardwareSerial gpsSerial(2);  // use ESP32's 2nd serial port (default serial 1 is for debug)
-Adafruit_GPS GPS(&gpsSerial);
+// HardwareSerial gpsSerial(2);  // use ESP32's 2nd serial port (default serial 1 is for debug)
+// Adafruit_GPS GPS(&gpsSerial);
 
 // Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
 // Set to 'true' if you want to debug and listen to the raw GPS sentences
 //#define GPSECHO  true
 
-
 CayenneLPP lpp(15);
 DHTesp dht;
-SSD1306  display(0x3c, 4, 15);
+SSD1306 display(0x3c, 4, 15);
 
-
-void onEvent (ev_t ev) 
+void onEvent(ev_t ev)
 {
   Serial.print(os_getTime());
   Serial.print(": ");
-  switch(ev) 
+  switch (ev)
   {
-    case EV_TXCOMPLETE:
-      Serial.printf("EV_TXCOMPLETE (includes waiting for RX windows)\r\n");
-      // Schedule next transmission
-      os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
-      break;  
-    case EV_RXCOMPLETE:
-      if (LMIC.dataLen)
-      {
-        Serial.printf("Received %d bytes\n", LMIC.dataLen);
-      }
-      break;
-    default:
-      Serial.printf("Unknown event\r\n");
-      break;
+  case EV_TXCOMPLETE:
+    Serial.printf("EV_TXCOMPLETE (includes waiting for RX windows)\r\n");
+    // Schedule next transmission
+    os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
+    break;
+  case EV_RXCOMPLETE:
+    if (LMIC.dataLen)
+    {
+      Serial.printf("Received %d bytes\n", LMIC.dataLen);
+    }
+    break;
+  default:
+    Serial.printf("Unknown event\r\n");
+    break;
   }
 }
 
-void do_send(osjob_t* j)
+void do_send(osjob_t *j)
 {
   // Check if there is not a current TX/RX job running
-  if (LMIC.opmode & OP_TXRXPEND) 
+  if (LMIC.opmode & OP_TXRXPEND)
   {
     Serial.printf("OP_TXRXPEND, not sending\r\n");
-  } 
-  else
-  if (!(LMIC.opmode & OP_TXRXPEND)) 
+  }
+  else if (!(LMIC.opmode & OP_TXRXPEND))
   {
     TempAndHumidity newValues = dht.getTempAndHumidity();
-    
+
     lpp.reset();
     lpp.addTemperature(1, newValues.temperature);
     lpp.addRelativeHumidity(2, newValues.humidity);
-    
+
     Serial.printf("Temperature : %.2f, Humidity : %.2f\r\n", newValues.temperature, newValues.humidity);
 
     display.drawString(0, 0, "Temperature: ");
     display.drawString(90, 0, String(newValues.temperature));
     display.drawString(0, 20, "Humidity  : ");
-    display.drawString(90,20, String(newValues.humidity));
-    display.display();    
+    display.drawString(90, 20, String(newValues.humidity));
+    display.display();
 
 #if 0    
     // Now for GPS
@@ -119,28 +115,27 @@ void do_send(osjob_t* j)
 #endif
     // Prepare upstream data transmission at the next possible time.
     LMIC_setTxData2(1, lpp.getBuffer(), lpp.getSize(), 0);
-         
+
     Serial.printf("Packet queued\r\n");
   }
   // Next TX is scheduled after TX_COMPLETE event.
 }
 
-void setup() 
+void setup()
 {
   Serial.begin(115200);
-  gpsSerial.begin(115200, SERIAL_8N1, SERIAL1_RXPIN, SERIAL1_TXPIN);
+  // gpsSerial.begin(115200, SERIAL_8N1, SERIAL1_RXPIN, SERIAL1_TXPIN);
   Serial.printf("Starting...\r\n");
 
-
-  pinMode(16,OUTPUT);
+  pinMode(16, OUTPUT);
   digitalWrite(16, LOW); // set GPIO16 low to reset OLED
   delay(50);
   digitalWrite(16, HIGH);
   display.init();
   display.setFont(ArialMT_Plain_10);
-  
+
   dht.setup(dhtPin, DHTesp::DHT11);
-  
+
 #if 0
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
   GPS.begin(9600);
@@ -160,7 +155,7 @@ void setup()
   // Request updates on antenna status, comment out to keep quiet
   GPS.sendCommand(PGCMD_ANTENNA);
 #endif
-  
+
   // LMIC init
   os_init();
   // Reset the MAC state. Session and pending data transfers will be discarded.
@@ -171,7 +166,7 @@ void setup()
   uint8_t nwkskey[sizeof(NWKSKEY)];
   memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
   memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
+  LMIC_setSession(0x1, DEVADDR, nwkskey, appskey);
   // Select frequencies range
   LMIC_selectSubBand(0);
   // Disable link check validation
@@ -179,13 +174,13 @@ void setup()
   // TTN uses SF9 for its RX2 window.
   LMIC.dn2Dr = DR_SF9;
   // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
-  LMIC_setDrTxpow(DR_SF7,14);
+  LMIC_setDrTxpow(DR_SF7, 14);
   Serial.printf("LMIC setup done!\r\n");
   // Start job
   do_send(&sendjob);
 }
 
-void loop() 
+void loop()
 {
 #if 0
   char c = GPS.read();
@@ -203,8 +198,8 @@ void loop()
   
     if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
       ; //return;  // we can fail to parse a sentence in which case we should just wait for another
-  } 
-#endif    
+  }
+#endif
   // Make sure LMIC is ran too
   os_runloop_once();
 }
