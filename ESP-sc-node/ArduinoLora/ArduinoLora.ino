@@ -31,13 +31,13 @@ static osjob_t sendjob;
 const unsigned TX_INTERVAL = 10; // Fair Use policy of TTN requires update interval of at least several min. We set update interval here of 1 min for testing
 
 // Pin mapping according to Cytron LoRa Shield RFM
+// Pin mapping
 const lmic_pinmap lmic_pins = {
     .nss = 18,
     .rxtx = LMIC_UNUSED_PIN,
     .rst = 14,
     .dio = {26, 33, 32},
 };
-
 /** Pin number for DHT11 data pin */
 int dhtPin = 17;
 
@@ -168,7 +168,7 @@ void setup()
   memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
   LMIC_setSession(0x1, DEVADDR, nwkskey, appskey);
   // Select frequencies range
-  LMIC_selectSubBand(0);
+  //  LMIC_selectSubBand(0);
   // Disable link check validation
   LMIC_setLinkCheckMode(0);
   // TTN uses SF9 for its RX2 window.
