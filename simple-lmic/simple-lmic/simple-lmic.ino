@@ -12,10 +12,13 @@
 
 #define DHTPIN 17     // what digital pin we're connected to
 // Uncomment whatever type you're using!
-#define DHTTYPE DHT11   // DHT 11
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+//#define DHTTYPE DHT11   // DHT 11
+#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 //#define DHTTYPE DHT21   // DHT 21 (AM2301)
 DHT dht(DHTPIN, DHTTYPE);
+
+uint16_t humidity;
+uint16_t temparature;
 
 
 
@@ -51,12 +54,16 @@ const lmic_pinmap lmic_pins = {
 };
 void do_send(osjob_t* j){
 
- uint8_t hum = dht.readHumidity();
-  // Read temperature as Celsius (the default)
-  Serial.println(hum);
 
- uint16_t temp = 10 * dht.readTemperature(true);
-   Serial.println(temp);
+
+ uint16_t temp = dht.readTemperature() * 100;
+   Serial.println(dht.readTemperature() * 100);
+   
+  uint16_t hum = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  Serial.println(dht.readHumidity());
+
+
 
   
     // Check if there is not a current TX/RX job running
@@ -65,24 +72,31 @@ void do_send(osjob_t* j){
     } else {
         // Prepare upstream data transmission at the next possible time.
 //        LMIC_setTxData2(1, mydata, sizeof(mydata)-1, 0);
-
-        uint8_t buff[3]; // reserve 3 bytes in memory
-
-// Handle high byte (MSB) first; 0xFF for -234 or 0x00 for +234
-// 0xFF16 >> 8 shifts the 0x16 out of memory, leaving 0x00FF
-// 0x00FF does not fit in a single byte, so only 0xFF is stored in buff[0]:
-buff[0] = temp >> 8;
-
-// Handle low byte (LSB) next; 0x16 for -234 or 0xEA for +234
-// 0xFF16 does not fit in a single byte, so only 0x16 is stored in buff[1]:
-buff[1] = temp;
-
-// No conversion needed, just copy 0x41 for 65%:
-buff[2] = hum;
+//
+//        uint8_t buff[3]; // reserve 3 bytes in memory
+//
+//// Handle high byte (MSB) first; 0xFF for -234 or 0x00 for +234
+//// 0xFF16 >> 8 shifts the 0x16 out of memory, leaving 0x00FF
+//// 0x00FF does not fit in a single byte, so only 0xFF is stored in buff[0]:
+//buff[0] = temp >> 8;
+//
+//// Handle low byte (LSB) next; 0x16 for -234 or 0xEA for +234
+//// 0xFF16 does not fit in a single byte, so only 0x16 is stored in buff[1]:
+//buff[1] = temp;
+//
+//// No conversion needed, just copy 0x41 for 65%:
+//buff[2] = hum;
 
 // Send the 3 bytes on port 1, without asking for confirmation.
 // This sends 0xFF1641 for -23.4 and 65%, or 0x00EA41 for +23.4 and 65%:
-LMIC_setTxData2(1, buff, sizeof(buff), 0);
+  byte payload[4];
+  payload[0] = highByte(temp);
+  payload[1] = lowByte(temp);
+  payload[2] = highByte(hum);
+  payload[3] = lowByte(hum);
+  
+//LMIC_setTxData2(1, buff, sizeof(buff), 0);
+LMIC_setTxData2(1, payload, sizeof(payload), 0);
 
 
         Serial.println(F("Packet queued"));
